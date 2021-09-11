@@ -37,11 +37,12 @@ function hsuser(args) {
     print('{"failed":true,"msg":"parameter exists with value true or false required"}');
     return;
   }
+  shell="/usr/bin/passwd";
   existingUsers = user.search({where:{name:username}});
   if ("false".localeCompare(shouldExist)) {
     if (existingUsers.length < 1) {
       try {
-        user.add({set:{name:username,shell:"/bin/bash",password:passwd}});
+        user.add({set:{name:username,shell:shell,password:passwd}});
         print('{"changed":true,"msg":"added"}');
       }
       catch (e) {
@@ -49,7 +50,7 @@ function hsuser(args) {
       }
     } else {
       try {
-        user.update({where:{name:username},set:{password:passwd,shell:"/bin/bash"}});
+        user.update({where:{name:username},set:{password:passwd,shell:shell}});
         print('{"changed":false,"msg":"updated"}');
       }
       catch (e) {
