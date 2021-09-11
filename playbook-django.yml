@@ -1,44 +1,52 @@
 ---
 - hosts: django
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   tasks:
   - name: ensure user exists
     hsuser.js: name="{{pac}}-{{user}}" password="{{password}}" exists="true"
   - name: setup domain
     hsdomain.js: name="{{domain}}" owner="{{pac}}-{{user}}" exists="true"
   - name: create env
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: virtualenv djangoenv chdir="/home/pacs/{{pac}}/users/{{user}}/"
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    command: python3 -m venv djangoenv chdir="/home/pacs/{{pac}}/users/{{user}}/"
+    args:
+      creates: "/home/pacs/{{pac}}/users/{{user}}/djangoenv"
   - name: install django
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: djangoenv/bin/easy_install django chdir="/home/pacs/{{pac}}/users/{{user}}/"
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    pip:
+      name: django
+      virtualenv: "/home/pacs/{{pac}}/users/{{user}}/djangoenv"
   - name: create project in home directory
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: /home/pacs/{{pac}}/users/{{user}}/djangoenv/bin/django-admin.py startproject mypro chdir="/home/pacs/{{pac}}/users/{{user}}/"
-  - name: create project in home directory
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: /home/pacs/{{pac}}/users/{{user}}/djangoenv/bin/python settings.py chdir="/home/pacs/{{pac}}/users/{{user}}/mypro/mypro"
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      . /home/pacs/{{pac}}/users/{{user}}/djangoenv/bin/activate
+      python3 /home/pacs/{{pac}}/users/{{user}}/djangoenv/bin/django-admin.py startproject mypro
+    args:
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/mypro"
+  - name: configure the project settings
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    lineinfile:
+      path: "/home/pacs/{{pac}}/users/{{user}}/mypro/mypro/settings.py"
+      regexp: "ALLOWED_HOSTS = .*"
+      line: "ALLOWED_HOSTS = [ '{{domain}}', 'www.{{domain}}' ]"
   - name: upload passenger_wsgi.py file to app directory
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    template: dest="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/app/passenger_wsgi.py" src="templates/django.passenger_wsgi.py" mode=0644
-  - name: start passenger_wsgi.py
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: /home/pacs/{{pac}}/users/{{user}}/djangoenv/bin/python passenger_wsgi.py chdir="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/app/"
-  - name: delete old www directory
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: rm -rf www chdir="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/subs"
-  - name: create new www directory
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
-    command: mkdir www chdir="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/subs"
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/app-ssl/passenger_wsgi.py" src="templates/django.passenger_wsgi.py" mode=0644
+  - name: delete index.html in www directory
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      path: /home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/subs-ssl/www/index.html
+      state: absent
   - name: upload .htaccess file to domain directory
-    sudo: yes
-    sudo_user: "{{pac}}-{{user}}"
+    become: yes
+    become_user: "{{pac}}-{{user}}"
     template: dest="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/.htaccess" src="templates/django.htaccess" mode=0644
 
